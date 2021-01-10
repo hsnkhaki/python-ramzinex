@@ -1,4 +1,6 @@
 import requests
+import logging
+logging.basicConfig(level=logging.INFO)
 
 
 class RamzinexPublic:
@@ -25,7 +27,7 @@ class RamzinexPublic:
         :return:
         """
         if log_level <= self.verbose:
-            print(message)
+            logging.info(message)
 
     def _tear_down_request(self, fun_name, message, base_log_level=0, *args, **kwargs):
         if self._send_message(message, base_log_level, *args, **kwargs):
@@ -101,6 +103,7 @@ class RamzinexPublic:
     def order_book(self, market):
         """
         return the order book of requested market
+
         :param market: a lowercase string for market, e.g., 'btcirr' or 'ethusdt'
         :return: a dictionary with two keys: 'buys' and 'sells' orders
         """
