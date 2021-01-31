@@ -1,13 +1,17 @@
 import requests
 import logging
+
 logging.basicConfig(level=logging.INFO)
+
+
+class NotAvailableOrderBook(object):
+    pass
 
 
 class RamzinexPublic:
     def __init__(self, verbose=0):
         """
 
-        :param api:
         :param verbose: 0 no log, 1 log responses only, 2 log responses and messages
         """
         self.verbose = verbose
@@ -59,13 +63,11 @@ class RamzinexPublic:
             return False
 
     def _get_price(self):
-        url = 'https://ramzinex.com/exchange/api/exchange/prices'
-        message = f'{url}'
+        message = f'{self.url}/prices'
         self._tear_down_request('_get_price', message, base_log_level=2)
         return self.resp
 
     def _get_currencies(self):
-        url = 'https://ramzinex.com/exchange/api/exchange/prices'
         message = f'{self.url}/currencies'
         self._tear_down_request('_get_currencies', message, base_log_level=2)
         return self.resp
@@ -73,9 +75,8 @@ class RamzinexPublic:
     def _extract_markets(self):
         if self._get_price():
             self.log_info('****extract_markets is done successfully', 1)
-            all_info = self.resp['original']
-            return {market: {item: info[item] for item in ['pair_id', 'financial']} for market, info in
-                    all_info.items()}
+            all_info = self.resp['data']
+            return all_info
         else:
             self.log_info('!!!!extract_markets is failed.', 1)
             return None
@@ -91,12 +92,14 @@ class RamzinexPublic:
             return None
 
     def _buys_book(self, pair_id):
-        message = f'{self.url}/orderbooks/{pair_id}/buys'
+        url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
+        message = f'{url_new}/orderbooks/{pair_id}/buys'
         self._tear_down_request('_buys_book', message, base_log_level=2)
         return self.resp
 
     def _sells_book(self, pair_id):
-        message = f'{self.url}/orderbooks/{pair_id}/sells'
+        url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
+        message = f'{url_new}/orderbooks/{pair_id}/sells'
         self._tear_down_request('_sells_book', message, base_log_level=2)
         return self.resp
 
@@ -111,15 +114,14 @@ class RamzinexPublic:
         pair_id = self.markets[market]['pair_id']
         buys = self._buys_book(pair_id)
         sells = self._sells_book(pair_id)
-        if 'data' in buys:
+        if 'data' in buys and 'data' in sells:
             self.resp = {
                 'buys': buys['data'],
                 'sells': sells['data'],
             }
             return self.resp
         else:
-            return 0
-
+            raise ValueError('Ramzinex order book is not available.')
 
     def order_book_buys(self, market):
         """
@@ -130,10 +132,30 @@ class RamzinexPublic:
         assert market in self.markets.keys(), f'invalid market: {market}'
         pair_id = self.markets[market]['pair_id']
         buys = self._buys_book(pair_id)
-        self.resp = {
-            'buys': buys['data'],
-        }
-        return self.resp
+        if 'data' in buys:
+            self.resp = {
+                'buys': buys['data'],
+            }
+            return self.resp
+        else:
+            ValueError('Ramzinex order book is not available.')
+
+    def order_book_sells(self, market):
+        """
+        return the order book of requested market only sells
+        :param market: a lowercase string for market, e.g., 'btcirr' or 'ethusdt'
+        :return: a dictionary with one key: 'sells' orders
+        """
+        assert market in self.markets.keys(), f'invalid market: {market}'
+        pair_id = self.markets[market]['pair_id']
+        sells = self._sells_book(pair_id)
+        if 'data' in sells:
+            self.resp = {
+                'sells': sells['data'],
+            }
+            return self.resp
+        else:
+            ValueError('Ramzinex order book is not available.')
 
 
 class RamzinexPrivate(RamzinexPublic):
@@ -180,10 +202,6 @@ class RamzinexPrivate(RamzinexPublic):
         self._tear_down_request('detailed_all_funds', message)
         return self.resp
 
-    def order_status(self, order_id):
-        message = f"{self.url}/users/me/orders2/{order_id}"
-        self._tear_down_request('in_order_fund', message)
-
     def submit_order(self, market, amount, price, order_type):
         assert market in self.markets.keys(), f'invalid market: {market}'
         assert order_type in ['buy', 'sell'], f'invalid order type: {order_type}'
@@ -207,3 +225,41 @@ class RamzinexPrivate(RamzinexPublic):
         message = f"{self.url}/users/me/orders2/{order_id}"
         self._tear_down_request('order_status', message, method='get')
         return self.resp
+
+    def get_user_order(self, limit, offset, types, markets, currencies, states, is_buy):
+        """
+        return the status of specified orders
+
+        :param limit: integer, number of requested orders
+        :param offset: integer, offset in the return orders
+        :param types: array of integer, 1: limit, 2: market
+        :param markets: array of strings, market pairs
+        :param currencies: array of strings, 'btc', 'irr', ...
+        :param states: arrays of integer, 1: open, 2: canceled, 3: filled
+        :param is_buy: boolean
+        :return:
+        """
+        param = {
+            'limit': limit,
+            'offset': offset,
+            'types': types,
+            'pairs': [self.markets[market]['pair_id'] for market in markets],
+            'currencies': [self.currencies[currency]['id'] for currency in currencies],
+            'states': states,
+            'is_buy': is_buy,
+        }
+        message = f"{self.url}/users/me/orders2"
+        self._tear_down_request('get_user_order', message, params=param, method='post')
+        return self.resp
+
+    def cancel_all_orders(self):
+        resp = self.get_user_order(10, 2, [], [], [], [], False)
+        if 'data' in resp:
+            open_orders = [data['id'] for data in resp['data'] if data['status_id'] == 1]
+            for order_id in open_orders:
+                self.cancel_order(order_id)
+                self.log_info(f'{order_id} is cancelled.', self.verbose)
+            return 1
+        else:
+            self.log_info('user order is not accessible.', self.verbose + 1)
+            return 0

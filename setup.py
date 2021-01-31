@@ -1,8 +1,8 @@
 from distutils.core import setup
 setup(
   name = 'python-ramzinex',         # How you named your package folder (MyLib)
-  packages = ['python-ramzinex'],   # Chose the same as "name"
-  version = '0.1',      # Start with a small number and increase it with every change you make
+  packages = ['ramzinex'],   # Chose the same as "name"
+  version = '0.101',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Ramzinex Exchange API python implementation for automated trading',   # Give a short description about your library
   author = 'Hossein',                   # Type in your name
