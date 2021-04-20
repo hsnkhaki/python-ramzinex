@@ -9,12 +9,14 @@ class NotAvailableOrderBook(object):
 
 
 class RamzinexPublic:
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=0, timeout=100):
         """
 
         :param verbose: 0 no log, 1 log responses only, 2 log responses and messages
         """
         self.verbose = verbose
+        self.timeout = timeout
+        self.resp = None
         self.url = 'https://ramzinex.com/exchange/api/v1.0/exchange'
         self.auth = None
         self.session = requests.Session()
@@ -53,8 +55,12 @@ class RamzinexPublic:
         """
         self.log_info(f'Sending {message} to server', base_log_level + 2)
         url = message
+        # try:
         self.resp = self.session.request(method, url, params=params, data=data,
-                                         headers=self.auth, timeout=30)
+                                         headers=self.auth, timeout=self.timeout)
+        # except requests.exceptions.ReadTimeout as e:
+        #     self.resp = False
+        #     return False
         self.log_info(f'received response: {self.resp.text}', base_log_level + 1)
         if self.resp.status_code == 200:
             self.resp = self.resp.json()
@@ -93,12 +99,14 @@ class RamzinexPublic:
 
     def _buys_book(self, pair_id):
         url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
+        # url_new = self.url
         message = f'{url_new}/orderbooks/{pair_id}/buys'
         self._tear_down_request('_buys_book', message, base_log_level=2)
         return self.resp
 
     def _sells_book(self, pair_id):
         url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
+        # url_new = self.url
         message = f'{url_new}/orderbooks/{pair_id}/sells'
         self._tear_down_request('_sells_book', message, base_log_level=2)
         return self.resp
@@ -253,6 +261,10 @@ class RamzinexPrivate(RamzinexPublic):
         return self.resp
 
     def cancel_all_orders(self):
+        """
+        Cancel the last 50 orders if they are open
+        :return:
+        """
         resp = self.get_user_order(10, 2, [], [], [], [], False)
         if 'data' in resp:
             open_orders = [data['id'] for data in resp['data'] if data['status_id'] == 1]
