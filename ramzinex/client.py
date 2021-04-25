@@ -1,4 +1,4 @@
-import requests
+import requests, json
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -239,11 +239,10 @@ class RamzinexPrivate(RamzinexPublic):
         return the status of specified orders
 
         :param limit: integer, number of requested orders
-        :param offset: integer, offset in the return orders
         :param types: array of integer, 1: limit, 2: market
         :param markets: array of strings, market pairs
         :param currencies: array of strings, 'btc', 'irr', ...
-        :param states: arrays of integer, 1: open, 2: canceled, 3: filled
+        :param states: arrays of integer, 1: open, 3: 100% filled, 4: canceled
         :param is_buy: boolean
         :return:
         """
@@ -257,21 +256,44 @@ class RamzinexPrivate(RamzinexPublic):
             'is_buy': is_buy,
         }
         message = f"{self.url}/users/me/orders2"
-        self._tear_down_request('get_user_order', message, params=param, method='post')
+        self._tear_down_request('get_user_order', message, data=json.dumps(param), method='post')
         return self.resp
 
-    def cancel_all_orders(self):
-        """
-        Cancel the last 50 orders if they are open
-        :return:
-        """
-        resp = self.get_user_order(10, 2, [], [], [], [], False)
-        if 'data' in resp:
-            open_orders = [data['id'] for data in resp['data'] if data['status_id'] == 1]
-            for order_id in open_orders:
-                self.cancel_order(order_id)
-                self.log_info(f'{order_id} is cancelled.', self.verbose)
-            return 1
-        else:
-            self.log_info('user order is not accessible.', self.verbose + 1)
-            return 0
+    # def cancel_all_orders(self):
+    #     """
+    #     Cancel the last 50 orders if they are open
+    #     :return:
+    #     """
+    #     resp = self.get_user_order(10, 2, [], [], [], [], False)
+    #     if 'data' in resp:
+    #         open_orders = [data['id'] for data in resp['data'] if data['status_id'] == 1]
+    #         for order_id in open_orders:
+    #             self.cancel_order(order_id)
+    #             self.log_info(f'{order_id} is cancelled.', self.verbose)
+    #         return 1
+    #     else:
+    #         self.log_info('user order is not accessible.', self.verbose + 1)
+    #         return 0
+
+    def currency_deposit_list(self, currency):
+        assert currency in self.currencies.keys(), f'invalid currency: {currency}'
+        message = f"{self.url}/users/me/funds/deposits/currency/{self.currencies[currency]['id']}"
+        self._tear_down_request('currency_deposit_list', message, method='get')
+        return self.resp
+
+    def withdraws_list(self):
+        message = f"{self.url}/users/me/funds/withdraws"
+        self._tear_down_request('withdraws_list', message, method='get')
+        return self.resp
+
+    def submit_withdraw_request(self, currency, param):
+        assert 'amount' in param, f'amount key is required in param input'
+        assert 'address' in param, f'address key is required in param input'
+        assert 'network_id' in param, f'network_id key is required in param input'
+        assert currency in self.currencies.keys(), f'invalid currency: {currency}'
+        param['currency_id'] = self.currencies[currency]['id']
+
+        param['no_tag'] = True if 'tag' in param else False
+        message = f"{self.url}/users/me/funds/withdraws/currency/{param['currency_id']}"
+        self._tear_down_request('submit_withdraw_request', message, data=json.dumps(param), method='post')
+        return self.resp
