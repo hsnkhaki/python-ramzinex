@@ -1,4 +1,5 @@
-import requests, json
+import requests
+import json
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -6,6 +7,10 @@ logging.basicConfig(level=logging.INFO)
 
 class NotAvailableOrderBook(object):
     pass
+
+
+def rx_lower(coin):
+    return coin.lower() if coin != 'AAVE' else 'AAVE'
 
 
 class RamzinexPublic:
@@ -115,7 +120,7 @@ class RamzinexPublic:
         """
         return the order book of requested market
 
-        :param market: a lowercase string for market, e.g., 'btcirr' or 'ethusdt'
+        :param market: a string for market, e.g., 'btcirr' or 'ethusdt'
         :return: a dictionary with two keys: 'buys' and 'sells' orders
         """
         assert market in self.markets.keys(), f'invalid market: {market}'
@@ -134,7 +139,7 @@ class RamzinexPublic:
     def order_book_buys(self, market):
         """
         return the order book of requested market only buys
-        :param market: a lowercase string for market, e.g., 'btcirr' or 'ethusdt'
+        :param market: a string for market, e.g., 'btcirr' or 'ethusdt'
         :return: a dictionary with one key: 'buys' orders
         """
         assert market in self.markets.keys(), f'invalid market: {market}'
@@ -151,7 +156,7 @@ class RamzinexPublic:
     def order_book_sells(self, market):
         """
         return the order book of requested market only sells
-        :param market: a lowercase string for market, e.g., 'btcirr' or 'ethusdt'
+        :param market: a string for market, e.g., 'btcirr' or 'ethusdt'
         :return: a dictionary with one key: 'sells' orders
         """
         assert market in self.markets.keys(), f'invalid market: {market}'
@@ -239,6 +244,7 @@ class RamzinexPrivate(RamzinexPublic):
         return the status of specified orders
 
         :param limit: integer, number of requested orders
+        :param offset: integer, offset of requested orders
         :param types: array of integer, 1: limit, 2: market
         :param markets: array of strings, market pairs
         :param currencies: array of strings, 'btc', 'irr', ...
@@ -281,9 +287,15 @@ class RamzinexPrivate(RamzinexPublic):
         self._tear_down_request('currency_deposit_list', message, method='get')
         return self.resp
 
-    def withdraws_list(self):
+    def withdraws_list(self, limit, currency):
+        assert currency in self.currencies.keys(), f'invalid currency: {currency}'
+        param = {
+            'currency_id': self.currencies[currency]['id'],
+            'limit': limit
+        }
+
         message = f"{self.url}/users/me/funds/withdraws"
-        self._tear_down_request('withdraws_list', message, method='get')
+        self._tear_down_request('withdraws_list', message, method='get', params=param)
         return self.resp
 
     def submit_withdraw_request(self, currency, param):
@@ -296,4 +308,13 @@ class RamzinexPrivate(RamzinexPublic):
         param['no_tag'] = True if 'tag' in param else False
         message = f"{self.url}/users/me/funds/withdraws/currency/{param['currency_id']}"
         self._tear_down_request('submit_withdraw_request', message, data=json.dumps(param), method='post')
+        return self.resp
+
+    def get_turnover(self, days=30):
+        param = {
+            'readable': 0,
+            'days': days
+        }
+        message = f"{self.url}/users/me/orders/turnover"
+        self._tear_down_request('turnover', message, params=param, method='GET')
         return self.resp
