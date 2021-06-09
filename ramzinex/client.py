@@ -23,6 +23,7 @@ class RamzinexPublic:
         self.timeout = timeout
         self.resp = None
         self.url = 'https://ramzinex.com/exchange/api/v1.0/exchange'
+        self.public_url = 'https://publicapi.ramzinex.com/exchange/api/v1.0/exchange'
         self.auth = None
         self.session = requests.Session()
         self.markets = self._extract_markets()
@@ -74,12 +75,12 @@ class RamzinexPublic:
             return False
 
     def _get_price(self):
-        message = f'{self.url}/prices'
+        message = f'{self.public_url}/prices'
         self._tear_down_request('_get_price', message, base_log_level=2)
         return self.resp
 
     def _get_currencies(self):
-        message = f'{self.url}/currencies'
+        message = f'{self.public_url}/currencies'
         self._tear_down_request('_get_currencies', message, base_log_level=2)
         return self.resp
 
@@ -103,16 +104,12 @@ class RamzinexPublic:
             return None
 
     def _buys_book(self, pair_id):
-        url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
-        # url_new = self.url
-        message = f'{url_new}/orderbooks/{pair_id}/buys'
+        message = f'{self.public_url}/orderbooks/{pair_id}/buys'
         self._tear_down_request('_buys_book', message, base_log_level=2)
         return self.resp
 
     def _sells_book(self, pair_id):
-        url_new = self.url.replace('ramzinex.com', 'publicapi.ramzinex.com')
-        # url_new = self.url
-        message = f'{url_new}/orderbooks/{pair_id}/sells'
+        message = f'{self.public_url}/orderbooks/{pair_id}/sells'
         self._tear_down_request('_sells_book', message, base_log_level=2)
         return self.resp
 
