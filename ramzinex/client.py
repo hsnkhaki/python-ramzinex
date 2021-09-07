@@ -1,6 +1,9 @@
 import requests
 import json
 import logging
+import time
+
+logger = logging.Logger('catch_all')
 
 logging.basicConfig(level=logging.INFO)
 
@@ -11,6 +14,10 @@ class NotAvailableOrderBook(object):
 
 def rx_lower(coin):
     return coin.lower() if coin != 'AAVE' else 'AAVE'
+
+
+def str2float(str_val):
+    return float(str_val.replace(',', ''))
 
 
 class RamzinexPublic:
@@ -24,6 +31,7 @@ class RamzinexPublic:
         self.resp = None
         self.url = 'https://ramzinex.com/exchange/api/v1.0/exchange'
         self.public_url = 'https://publicapi.ramzinex.com/exchange/api/v1.0/exchange'
+        # self.public_url = self.url
         self.auth = None
         self.session = requests.Session()
         self.markets = self._extract_markets()
@@ -62,8 +70,19 @@ class RamzinexPublic:
         self.log_info(f'Sending {message} to server', base_log_level + 2)
         url = message
         # try:
-        self.resp = self.session.request(method, url, params=params, data=data,
-                                         headers=self.auth, timeout=self.timeout)
+        N_RANGE = 4
+        WAIT_TIME = 60
+        for ii in range(N_RANGE):
+
+            self.resp = self.session.request(method, url, params=params, data=data,
+                                             headers=self.auth, timeout=self.timeout)
+
+            if self.resp.status_code == 200 and self.resp.json()['status'] == -82:
+                self.log_info(f'{self.resp} - try again after {WAIT_TIME} sec ({ii + 1})/{N_RANGE}', log_level=0)
+                time.sleep(WAIT_TIME)
+            else:
+                break
+
         # except requests.exceptions.ReadTimeout as e:
         #     self.resp = False
         #     return False
@@ -97,8 +116,7 @@ class RamzinexPublic:
         if self._get_currencies():
             self.log_info('****extract_currencies is done successfully', 1)
             all_info = self.resp['data']
-            return {info['symbol']: {item: info[item] for item in ['id', 'show_precision']} for info in
-                    all_info}
+            return {info['symbol']: {item: info[item] for item in info.keys()} for info in all_info}
         else:
             self.log_info('!!!!extract_markets is failed.', 1)
             return None
@@ -195,12 +213,94 @@ class RamzinexPrivate(RamzinexPublic):
         assert currency in self.currencies.keys(), f'invalid currency: {currency}'
         message = f"{self.url}/users/me/funds/details/currency/{self.currencies[currency]['id']}"
         self._tear_down_request('detailed_fund', message)
-        return self.resp
+        # return self.resp
+        if isinstance(self.resp, dict):
+            return self.resp
+        else:
+            try:
+                total_balance = self.total_fund(currency=currency)['data']
+                available_balance = self.available_fund(currency=currency)['data']
+                in_order = total_balance - available_balance
+
+                if currency == 'irr':
+                    buy_irr = None
+                    sell_irr = None
+                    buy_usdt = None
+                    sell_usdt = None
+                else:
+                    buy_irr = str2float(self.order_book_buys(f'{currency}irr')['buys'][0][0])
+                    sell_irr = str2float(self.order_book_sells(f'{currency}irr')['sells'][-1][0])
+                    if f'{currency}usdt' in self.markets:
+                        buy_usdt = str2float(self.order_book_buys(f'{currency}usdt')['buys'][0][0])
+                        sell_usdt = str2float(self.order_book_sells(f'{currency}usdt')['sells'][-1][0])
+                    else:
+                        buy_usdt = None
+                        sell_usdt = None
+
+                output = {
+                    "status": 0,
+                    "data": {
+                        "total": str(total_balance),
+                        "in_order": str(in_order),
+                        "available": str(available_balance),
+                        "currency": {
+                            "symbol": self.currencies[currency]['symbol'],
+                            "name": self.currencies[currency]['name'],
+                            "fee": self.currencies[currency]['withdraw_fee'],
+                            "precision": self.currencies[currency]['show_precision'],
+                            "show_order": self.currencies[currency]['show_order']
+                        },
+                        "is_rial": 'irr' == self.currencies[currency]['symbol'],
+                        "has_tag": self.currencies[currency]['has_tag'],
+                        "rialCards": [],
+                        "address": None,
+                        "exchange_address": None,
+                        "currency_id": self.currencies[currency]['id'],
+                        "rial_equivalent": {
+                            "buy": buy_irr,
+                            "sell": sell_irr,
+                            "show": None
+                        },
+                        "rial_equivalent_show": total_balance * (
+                                    buy_irr + sell_irr) / 2 if buy_irr is not None else None,
+                        "usdt_equivalent": {
+                            "buy": buy_usdt,
+                            "sell": sell_usdt,
+                            "show": None
+                        },
+                        "total_nr": None,
+                        "in_order_nr": None,
+                        "available_nr": None,
+                        "international_price": self.currencies[currency]['international_price'],
+                        "related_pairs": self.currencies[currency]['related_pairs'],
+                        "rial_related_pair": self.currencies[currency]['rial_related_pair']
+                    }
+                }
+            except Exception as E:
+                logger.error(E, exc_info=True)
+                output = {
+                    "status": -1,
+                    "data": None
+                }
+            return output
 
     def detailed_all_funds(self):
         message = f"{self.url}/users/me/funds/details"
         self._tear_down_request('detailed_all_funds', message)
-        return self.resp
+        # return self.resp
+        if isinstance(self.resp, dict):
+            return self.resp
+        else:
+            data = []
+            for currency in self.currencies:
+                d = self.detailed_fund(currency)['data']
+                if d:
+                    data.append(d)
+            output = {
+                "status": 0,
+                "data": data
+            }
+            return output
 
     def rial_equ_funds(self):
         message = f"{self.url}/users/me/funds/rial_equivalent"
@@ -315,3 +415,15 @@ class RamzinexPrivate(RamzinexPublic):
         message = f"{self.url}/users/me/orders/turnover"
         self._tear_down_request('turnover', message, params=param, method='GET')
         return self.resp
+
+# import cloudscraper
+#
+#
+#
+# scraper = cloudscraper.create_scraper()
+# s = scraper.get('https://publicapi.ramzinex.com/exchange/api/v1.0/exchange/orderbooks/2/buys')
+# cookies=s.cookies
+#
+# session = cloudscraper.Session()
+# session.cookies = cookies
+# r = session.get('https://publicapi.ramzinex.com/exchange/api/v1.0/exchange/orderbooks/2/buys')
