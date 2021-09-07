@@ -31,7 +31,6 @@ class RamzinexPublic:
         self.resp = None
         self.url = 'https://ramzinex.com/exchange/api/v1.0/exchange'
         self.public_url = 'https://publicapi.ramzinex.com/exchange/api/v1.0/exchange'
-        # self.public_url = self.url
         self.auth = None
         self.session = requests.Session()
         self.markets = self._extract_markets()
