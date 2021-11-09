@@ -17,7 +17,7 @@ def rx_lower(coin):
 
 
 def str2float(str_val):
-    return float(str_val.replace(',', ''))
+    return float(str_val.replace(',', '')) if isinstance(str_val, str) else str_val
 
 
 class RamzinexPublic:
