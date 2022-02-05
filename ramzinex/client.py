@@ -106,6 +106,9 @@ class RamzinexPublic:
         if self._get_price():
             self.log_info('****extract_markets is done successfully', 1)
             all_info = self.resp['data']
+            if 'miotairr' in all_info:
+                all_info['iotairr'] = all_info.pop('miotairr')
+                all_info['iotairr']['tv_symbol']['ramzinex'] = 'iotairr'
             return all_info
         else:
             self.log_info('!!!!extract_markets is failed.', 1)
