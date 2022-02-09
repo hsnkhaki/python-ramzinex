@@ -109,6 +109,9 @@ class RamzinexPublic:
             if 'miotairr' in all_info:
                 all_info['iotairr'] = all_info.pop('miotairr')
                 all_info['iotairr']['tv_symbol']['ramzinex'] = 'iotairr'
+            if 'ftxirr' in all_info:
+                all_info['fttirr'] = all_info.pop('ftxirr')
+                all_info['fttirr']['tv_symbol']['ramzinex'] = 'fttirr'
             return all_info
         else:
             self.log_info('!!!!extract_markets is failed.', 1)
