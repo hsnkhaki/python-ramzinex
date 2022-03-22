@@ -76,7 +76,7 @@ class RamzinexPublic:
             self.resp = self.session.request(method, url, params=params, data=data,
                                              headers=self.auth, timeout=self.timeout)
 
-            if self.resp.status_code == 200 and self.resp.json()['status'] == -82:
+            if self.resp.status_code == 200 and self.resp.text and self.resp.json()['status'] == -82:
                 self.log_info(f'{self.resp} - try again after {WAIT_TIME} sec ({ii + 1})/{N_RANGE}', log_level=0)
                 time.sleep(WAIT_TIME)
             else:
@@ -87,7 +87,7 @@ class RamzinexPublic:
         #     return False
         self.log_info(f'received response: {self.resp.text}', base_log_level + 1)
         if self.resp.status_code == 200:
-            self.resp = self.resp.json()
+            self.resp = self.resp.json() if self.resp.text else {}
             return True
         else:
             return False
