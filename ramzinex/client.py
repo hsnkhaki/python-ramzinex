@@ -112,6 +112,12 @@ class RamzinexPublic:
             if 'ftxirr' in all_info:
                 all_info['fttirr'] = all_info.pop('ftxirr')
                 all_info['fttirr']['tv_symbol']['ramzinex'] = 'fttirr'
+            if 'lunairr' in all_info:
+                all_info['lunairr']['pair_id'] = 307
+                all_info['lunairr']['base_currency_symbol']['en'] = 'luna'
+            if 'lunausdt' in all_info:
+                all_info['luncusdt'] = all_info.pop('lunausdt')
+
             return all_info
         else:
             self.log_info('!!!!extract_markets is failed.', 1)
