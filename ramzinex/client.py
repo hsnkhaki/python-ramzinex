@@ -273,7 +273,7 @@ class RamzinexPrivate(RamzinexPublic):
                             "show": None
                         },
                         "rial_equivalent_show": total_balance * (
-                                    buy_irr + sell_irr) / 2 if buy_irr is not None else None,
+                                buy_irr + sell_irr) / 2 if buy_irr is not None else None,
                         "usdt_equivalent": {
                             "buy": buy_usdt,
                             "sell": sell_usdt,
@@ -312,6 +312,39 @@ class RamzinexPrivate(RamzinexPublic):
                 "data": data
             }
             return output
+
+    def detailed_funds_summary(self):
+        message = f"{self.url}/users/me/funds/summaryDesktop"
+        self._tear_down_request('detailed_funds_summary', message)
+        if 'data' not in self.resp:
+            return self.resp
+
+        output = []
+        for item in self.resp['data']:
+            currency = [c for c in self.currencies.values() if c['id'] == item['currency_id']][0]
+            out = {
+                "total": str(item['total_nr']),
+                "in_order": str(item['in_order_nr']),
+                "available": str(item['total_nr'] - item['in_order_nr']),
+                "currency": {
+                    "icon": currency['icon'],
+                    "symbol": currency['symbol'],
+                    "name": currency['name'],
+                    "fee": currency['withdraw_fee'],
+                    "precision": currency['show_precision'],
+                    "show_order": currency['show_order']
+                },
+                "has_tag": currency['has_tag'],
+                "total_nr": item['total_nr'],
+                "in_order_nr": item['in_order_nr'],
+                "available_nr": item['total_nr'] - item['in_order_nr']
+            }
+            output.append(out)
+
+        return {
+            "status": 0,
+            "data": output
+        }
 
     def rial_equ_funds(self):
         message = f"{self.url}/users/me/funds/rial_equivalent"
@@ -425,6 +458,15 @@ class RamzinexPrivate(RamzinexPublic):
         }
         message = f"{self.url}/users/me/orders/turnover"
         self._tear_down_request('turnover', message, params=param, method='GET')
+        return self.resp
+
+    def confirm_withdraw(self, withdraw_id, code, ga_code):
+        message = f"{self.url}/users/me/funds/withdraws/{withdraw_id}/verify"
+        param = {
+            'code': code,
+            'ga_code': ga_code
+        }
+        self._tear_down_request('confirm_withdraw', message, data=json.dumps(param), method='post')
         return self.resp
 
 # import cloudscraper
