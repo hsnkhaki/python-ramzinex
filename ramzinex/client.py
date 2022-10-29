@@ -200,7 +200,8 @@ class RamzinexPublic:
 class RamzinexPrivate(RamzinexPublic):
     def __init__(self, token, verbose=0):
         super().__init__(verbose)
-        self.auth = {'Authorization': 'Bearer ' + token}
+        self.auth = {'Authorization': 'Bearer ' + token,
+                     'referer': 'https://ramzinex.com/exchange/pt/wallet'}
 
     def total_fund(self, currency):
         assert currency in self.currencies.keys(), f'invalid currency: {currency}'
